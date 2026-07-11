@@ -120,3 +120,13 @@ def test_on_tool_hook_fires(byo_source):
     with agent.override(model=FunctionModel(model_fn)):
         agent.run_sync("list", deps=deps)
     assert calls == [("list_matches", "all")]
+
+
+def test_deepinfra_model_string_builds_openai_compatible_model(monkeypatch):
+    monkeypatch.setenv("DEEPINFRA_API_KEY", "test-key")
+    from gaffer.agent import _to_model
+
+    model = _to_model("deepinfra:moonshotai/Kimi-K2.6")
+    assert type(model).__name__ == "OpenAIChatModel"
+    assert model.model_name == "moonshotai/Kimi-K2.6"
+    assert _to_model("anthropic:claude-sonnet-5") == "anthropic:claude-sonnet-5"

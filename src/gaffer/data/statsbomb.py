@@ -240,7 +240,7 @@ class StatsBombSource:
         hits = [
             c
             for c in comps
-            if all(t in f"{c['competition_name']} {c['season_name']}".lower() for t in tokens)
+            if all(t in f"{c.competition_name} {c.season_name}".lower() for t in tokens)
         ]
         if not hits:
             available = sorted({c.competition_name for c in comps})

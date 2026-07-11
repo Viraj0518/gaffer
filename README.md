@@ -90,6 +90,7 @@ Precedence: `--model` flag → `COACH_MODEL` env var → default.
 | OpenAI | `openai:gpt-5` | `OPENAI_API_KEY` |
 | Google | `google-gla:gemini-2.5-flash` | `GEMINI_API_KEY` |
 | Ollama (local) | `ollama:llama3.2` | nothing (`OLLAMA_BASE_URL` to override) |
+| DeepInfra | `deepinfra:moonshotai/Kimi-K2.6` | `DEEPINFRA_API_KEY` |
 | anything else PydanticAI supports | `groq:...`, `mistral:...`, ... | provider extra: `pip install pydantic-ai-slim[groq]` |
 
 ## Architecture

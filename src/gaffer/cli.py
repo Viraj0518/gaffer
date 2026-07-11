@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
+import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
-from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
 from gaffer.agent import DEFAULT_MODEL, MODEL_ENV, CoachDeps, build_agent, resolve_model
 from gaffer.data import cache, make_source
+
+# Never crash on glyphs a legacy Windows console/pipe can't encode.
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        with contextlib.suppress(Exception):
+            stream.reconfigure(errors="replace")
 
 app = typer.Typer(
     help="An AI soccer coach grounded in real match data. Provider-agnostic.",
@@ -46,6 +53,7 @@ _KEY_ENV = {
     "google": "GEMINI_API_KEY",
     "groq": "GROQ_API_KEY",
     "mistral": "MISTRAL_API_KEY",
+    "deepinfra": "DEEPINFRA_API_KEY",
 }
 
 
@@ -77,12 +85,17 @@ def _deps(data_dir: Path | None, verbose: bool) -> CoachDeps:
     return CoachDeps(source=make_source(data_dir), on_tool=on_tool)
 
 
-async def _stream_turn(agent, deps: CoachDeps, prompt: str, history) -> list:
-    async with agent.run_stream(prompt, deps=deps, message_history=history) as result:
-        with Live(console=console, vertical_overflow="visible") as live:
-            async for text in result.stream_text():
-                live.update(Markdown(text))
-        return result.all_messages()
+async def _run_turn(agent, deps: CoachDeps, prompt: str, history) -> list:
+    # agent.run (not run_stream): several models interleave text with tool
+    # calls, which makes "first text = final answer" streaming unreliable.
+    if console.is_terminal:
+        with console.status("[dim]the gaffer is checking the data…[/dim]"):
+            result = await agent.run(prompt, deps=deps, message_history=history)
+        console.print(Markdown(result.output))
+    else:
+        result = await agent.run(prompt, deps=deps, message_history=history)
+        console.print(result.output)
+    return result.all_messages()
 
 
 @app.command()
@@ -112,7 +125,7 @@ def chat(model: ModelOpt = None, data_dir: DataDirOpt = None, verbose: VerboseOp
         if question.lower() in {"/quit", "/exit", "quit", "exit"}:
             break
         try:
-            history = asyncio.run(_stream_turn(agent, deps, question, history))
+            history = asyncio.run(_run_turn(agent, deps, question, history))
         except Exception as exc:  # surface provider/network errors without a traceback wall
             console.print(f"[red]error:[/red] {exc}")
     console.print("[dim]full time.[/dim]")
@@ -129,7 +142,7 @@ def ask(
     model_name = resolve_model(model)
     _preflight(model_name)
     agent = build_agent(model_name)
-    asyncio.run(_stream_turn(agent, _deps(data_dir, verbose), question, None))
+    asyncio.run(_run_turn(agent, _deps(data_dir, verbose), question, None))
 
 
 @app.command()

@@ -66,7 +66,8 @@ def resolve_model(model: str | None = None) -> str:
 
     Any PydanticAI model string works: `anthropic:...`, `openai:...`,
     `google-gla:...`, `groq:...`, `ollama:...` (local; base URL defaults to
-    the standard localhost Ollama endpoint), etc.
+    the standard localhost Ollama endpoint), plus `deepinfra:...` for
+    DeepInfra's OpenAI-compatible API.
     """
     name = model or os.environ.get(MODEL_ENV) or DEFAULT_MODEL
     if name.startswith("ollama:"):
@@ -74,9 +75,30 @@ def resolve_model(model: str | None = None) -> str:
     return name
 
 
+def _to_model(name: str):
+    """Turn a model string into what Agent() accepts.
+
+    Providers PydanticAI knows pass through as strings; OpenAI-compatible
+    endpoints it has no prefix for (like DeepInfra) get built explicitly.
+    The same three lines adapt any OpenAI-compatible host.
+    """
+    if name.startswith("deepinfra:"):
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+
+        return OpenAIChatModel(
+            name.split(":", 1)[1],
+            provider=OpenAIProvider(
+                base_url="https://api.deepinfra.com/v1/openai",
+                api_key=os.environ.get("DEEPINFRA_API_KEY", ""),
+            ),
+        )
+    return name
+
+
 def build_agent(model: str | None = None) -> Agent[CoachDeps, str]:
     agent: Agent[CoachDeps, str] = Agent(
-        resolve_model(model),
+        _to_model(resolve_model(model)),
         deps_type=CoachDeps,
         instructions=COACH_INSTRUCTIONS,
         retries=3,
