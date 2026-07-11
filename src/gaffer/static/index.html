@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gaffer — AI soccer coach</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #21262d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #3fb950; --user: #1f6feb;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header .model {
+    margin-left: auto; font-size: 12px; color: var(--dim);
+    border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px;
+  }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    width: 290px; border-right: 1px solid var(--border); overflow-y: auto;
+    padding: 14px; background: var(--panel); flex-shrink: 0;
+  }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 10px; }
+  aside .match {
+    padding: 7px 9px; border-radius: 6px; font-size: 13px; color: var(--dim);
+    cursor: pointer; margin-bottom: 2px;
+  }
+  aside .match:hover { background: var(--border); color: var(--text); }
+  #chatwrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .msg { max-width: 780px; padding: 12px 16px; border-radius: 10px; overflow-wrap: break-word; }
+  .msg.user { background: var(--user); align-self: flex-end; }
+  .msg.coach { background: var(--panel); border: 1px solid var(--border); align-self: flex-start; }
+  .msg.coach.thinking { color: var(--dim); font-style: italic; }
+  .tools { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 6px; max-width: 780px; }
+  .tool {
+    font-size: 11px; font-family: ui-monospace, monospace; color: var(--accent);
+    border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px;
+  }
+  .msg.coach :is(h1,h2,h3) { margin: 10px 0 6px; font-size: 15px; }
+  .msg.coach p, .msg.coach ul, .msg.coach ol { margin: 6px 0; }
+  .msg.coach ul, .msg.coach ol { padding-left: 22px; }
+  .msg.coach code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .msg.coach table { border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; }
+  .msg.coach th, .msg.coach td { border: 1px solid var(--border); padding: 4px 10px; font-size: 13px; }
+  #suggestions { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 24px 10px; }
+  #suggestions button {
+    background: var(--panel); color: var(--dim); border: 1px solid var(--border);
+    border-radius: 20px; padding: 6px 14px; font-size: 13px; cursor: pointer;
+  }
+  #suggestions button:hover { color: var(--text); border-color: var(--accent); }
+  form { display: flex; gap: 10px; padding: 14px 24px 20px; border-top: 1px solid var(--border); }
+  input[type=text] {
+    flex: 1; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 12px 14px; font-size: 15px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+  button.send {
+    background: var(--accent); color: #04260f; font-weight: 700; border: 0;
+    border-radius: 8px; padding: 0 22px; font-size: 15px; cursor: pointer;
+  }
+  button.send:disabled { opacity: .5; cursor: wait; }
+  @media (max-width: 760px) { aside { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ gaffer</h1>
+  <span style="color:var(--dim);font-size:13px">AI soccer coach — the LLM coaches, tools compute the stats</span>
+  <span class="model">{{MODEL}}</span>
+</header>
+<main>
+  <aside>
+    <h2>Matches on file</h2>
+    <div id="matches"><div class="match">loading…</div></div>
+  </aside>
+  <div id="chatwrap">
+    <div id="chat">
+      <div class="msg coach">Alright, I'm the gaffer. Ask me about any match on file —
+        tactics, players, what went wrong, what to train next. Every number I give you
+        comes straight from the event data.</div>
+    </div>
+    <div id="suggestions">
+      <button>How did Argentina win the 2022 final?</button>
+      <button>Scout France's attack for me</button>
+      <button>Was Morocco's defense as good as it looked?</button>
+      <button>Compare Messi and Mbappé in the final</button>
+    </div>
+    <form id="form">
+      <input id="input" type="text" placeholder="Ask the coach…" autocomplete="off" autofocus>
+      <button class="send" id="send" type="submit">Send</button>
+    </form>
+  </div>
+</main>
+<script>
+const sid = crypto.randomUUID();
+const chat = document.getElementById("chat");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+
+// minimal markdown: headings, bold/italic, lists, tables, code — good enough for chat
+function md(text) {
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  let html = esc(text);
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
+  html = html.replace(/^### (.*)$/gm, "<h3>$1</h3>").replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^# (.*)$/gm, "<h1>$1</h1>");
+  // tables
+  html = html.replace(/((?:^\|.*\|\s*$\n?)+)/gm, block => {
+    const rows = block.trim().split("\n").map(r => r.replace(/^\||\|$/g, "").split("|").map(c => c.trim()));
+    if (rows.length < 2) return block;
+    const body = rows.filter(r => !r.every(c => /^:?-+:?$/.test(c)));
+    const [head, ...rest] = body;
+    return "<table><tr>" + head.map(c => `<th>${c}</th>`).join("") + "</tr>" +
+      rest.map(r => "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>").join("") + "</table>";
+  });
+  // lists
+  html = html.replace(/((?:^[-*] .*$\n?)+)/gm, block =>
+    "<ul>" + block.trim().split("\n").map(l => `<li>${l.replace(/^[-*] /, "")}</li>`).join("") + "</ul>");
+  html = html.replace(/((?:^\d+\. .*$\n?)+)/gm, block =>
+    "<ol>" + block.trim().split("\n").map(l => `<li>${l.replace(/^\d+\. /, "")}</li>`).join("") + "</ol>");
+  return html.split(/\n{2,}/).map(p => /^<(h\d|ul|ol|table)/.test(p.trim()) ? p : `<p>${p.replace(/\n/g,"<br>")}</p>`).join("");
+}
+
+function bubble(cls, html) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.innerHTML = html;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function askCoach(question) {
+  bubble("user", md(question));
+  input.value = "";
+  send.disabled = true;
+  const thinking = bubble("coach thinking", "checking the data…");
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: sid, message: question}),
+    });
+    const data = await res.json();
+    thinking.remove();
+    if (!res.ok) { bubble("coach", `<p><b>error:</b> ${md(String(data.detail || res.status))}</p>`); return; }
+    if (data.tools.length) {
+      const tools = document.createElement("div");
+      tools.className = "tools";
+      tools.innerHTML = data.tools.map(t => `<span class="tool">⚙ ${t.tool}(${t.detail})</span>`).join("");
+      chat.appendChild(tools);
+    }
+    bubble("coach", md(data.answer));
+  } catch (err) {
+    thinking.remove();
+    bubble("coach", `<p><b>error:</b> ${err}</p>`);
+  } finally {
+    send.disabled = false;
+    input.focus();
+  }
+}
+
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  const q = input.value.trim();
+  if (q) askCoach(q);
+});
+document.querySelectorAll("#suggestions button").forEach(b =>
+  b.addEventListener("click", () => askCoach(b.textContent)));
+
+fetch("/api/matches").then(r => r.json()).then(list => {
+  const el = document.getElementById("matches");
+  el.innerHTML = "";
+  list.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "match";
+    div.textContent = m.label;
+    div.title = "Ask about this match";
+    div.addEventListener("click", () => askCoach(`Give me a tactical breakdown of ${m.label}`));
+    el.appendChild(div);
+  });
+}).catch(() => {});
+</script>
+</body>
+</html>

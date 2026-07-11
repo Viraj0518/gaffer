@@ -1,0 +1,36 @@
+[
+  {
+    "match_id": 1001,
+    "date": "2026-05-10",
+    "competition": "Sunday League",
+    "season": "2026",
+    "home_team": "Rovers",
+    "away_team": "United",
+    "home_score": 2,
+    "away_score": 1,
+    "formations": { "Rovers": "4-4-2", "United": "4-3-3" },
+    "lineups": {
+      "Rovers": [
+        { "id": 1, "name": "Alice", "position": "Center Midfield" },
+        { "id": 2, "name": "Bob", "position": "Striker" },
+        { "id": 3, "name": "Cara", "position": "Right Wing" },
+        { "id": 4, "name": "Dana", "position": "Center Back" }
+      ],
+      "United": [
+        { "id": 11, "name": "Xavier", "position": "Center Back" },
+        { "id": 12, "name": "Yann", "position": "Center Midfield" },
+        { "id": 13, "name": "Zane", "position": "Striker" }
+      ]
+    }
+  },
+  {
+    "match_id": 1002,
+    "date": "2026-05-17",
+    "competition": "Sunday League",
+    "season": "2026",
+    "home_team": "United",
+    "away_team": "Rovers",
+    "home_score": 0,
+    "away_score": 1
+  }
+]

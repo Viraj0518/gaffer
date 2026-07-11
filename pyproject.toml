@@ -1,0 +1,62 @@
+[project]
+name = "gaffer"
+version = "0.1.0"
+description = "An AI soccer coach grounded in real match data. Provider-agnostic: Anthropic, OpenAI, Google, or local Ollama."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Viraj Sharma" }]
+keywords = ["soccer", "football", "ai", "agent", "statsbomb", "analytics", "coach"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-ai-slim[anthropic,openai,google]>=1.0",
+    "statsbombpy>=1.14",
+    "typer>=0.12",
+    "rich>=13.7",
+    "platformdirs>=4.2",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
+[project.urls]
+Repository = "https://github.com/Viraj0518/gaffer"
+
+[project.scripts]
+coach = "gaffer.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gaffer"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
