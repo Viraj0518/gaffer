@@ -74,7 +74,7 @@ uv run coach chat --verbose      # see the tool calls as they happen
 |---|---|
 | `coach chat` | interactive chat with the coach (streaming, markdown) |
 | `coach ask "..."` | one-shot question, scriptable |
-| `coach serve` | local web UI at http://localhost:8000 |
+| `coach serve` | local web UI at http://localhost:8000 — installable as a PWA on your phone |
 | `coach matches` | list available matches — works without any API key |
 | `coach cache info\|clear` | manage the local data cache |
 

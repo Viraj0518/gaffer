@@ -9,13 +9,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from gaffer.agent import CoachDeps, build_agent, resolve_model
 from gaffer.data import make_source
 
-_PAGE = Path(__file__).parent / "static" / "index.html"
+_STATIC = Path(__file__).parent / "static"
+_PAGE = _STATIC / "index.html"
 
 
 class ChatRequest(BaseModel):
@@ -41,9 +43,33 @@ def create_app(model: str | None = None, data_dir: Path | None = None) -> FastAP
 
     app = FastAPI(title="gaffer", docs_url=None, redoc_url=None)
 
+    # Icons and other static assets (referenced from the manifest as /static/*).
+    app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         return _PAGE.read_text(encoding="utf-8").replace("{{MODEL}}", model_name)
+
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    def manifest() -> FileResponse:
+        return FileResponse(
+            _STATIC / "manifest.webmanifest", media_type="application/manifest+json"
+        )
+
+    @app.get("/sw.js", include_in_schema=False)
+    def service_worker() -> FileResponse:
+        # Served from root so its scope covers the whole app.
+        return FileResponse(
+            _STATIC / "sw.js",
+            media_type="text/javascript",
+            headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+        )
+
+    @app.get("/apple-touch-icon.png", include_in_schema=False)
+    @app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
+    def apple_touch_icon() -> FileResponse:
+        # iOS probes these root paths directly when adding to the home screen.
+        return FileResponse(_STATIC / "apple-touch-icon.png", media_type="image/png")
 
     @app.get("/api/matches")
     def api_matches() -> list[dict]:
