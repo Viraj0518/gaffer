@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Etymology Voice</title>
+<meta name="description" content="Ask by voice: where does any word come from? Origins, historical meaning, evolution — including slang.">
+<style>
+  :root {
+    --bg0: #0b0e14;
+    --bg1: #121826;
+    --card: #171f30;
+    --card2: #1d2740;
+    --ink: #e8ecf4;
+    --ink-dim: #9aa5bd;
+    --accent: #7c5cff;
+    --accent2: #22d3ee;
+    --hot: #ff5c7a;
+    --ok: #34d399;
+    --radius: 18px;
+    --font: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(124, 92, 255, .18), transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, rgba(34, 211, 238, .12), transparent 60%),
+      linear-gradient(180deg, var(--bg0), var(--bg1));
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+  }
+  header { text-align: center; margin: 12px 0 20px; }
+  header h1 {
+    font-size: clamp(26px, 5vw, 38px);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p { color: var(--ink-dim); margin-top: 6px; font-size: 15px; }
+  header p code {
+    background: rgba(124, 92, 255, .15);
+    border: 1px solid rgba(124, 92, 255, .35);
+    padding: 1px 7px; border-radius: 8px;
+    font-size: 13px; color: var(--ink);
+  }
+
+  .stage { width: 100%; max-width: 760px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+
+  /* ---- mic orb ---- */
+  .orb-wrap { position: relative; margin: 8px 0 2px; }
+  .orb {
+    width: 110px; height: 110px; border-radius: 50%;
+    border: none; cursor: pointer; position: relative; z-index: 2;
+    background: radial-gradient(circle at 32% 28%, #a08bff, var(--accent) 55%, #4c34c4);
+    box-shadow: 0 10px 40px rgba(124, 92, 255, .45), inset 0 -6px 18px rgba(0,0,0,.35);
+    display: grid; place-items: center;
+    transition: transform .15s ease, box-shadow .3s ease;
+  }
+  .orb:active { transform: scale(.96); }
+  .orb svg { width: 42px; height: 42px; fill: #fff; }
+  .orb.listening {
+    background: radial-gradient(circle at 32% 28%, #ff9db1, var(--hot) 55%, #b91c3c);
+    box-shadow: 0 10px 44px rgba(255, 92, 122, .5), inset 0 -6px 18px rgba(0,0,0,.35);
+  }
+  .ring { position: absolute; inset: 0; border-radius: 50%; z-index: 1; pointer-events: none; }
+  .orb.listening ~ .ring { animation: pulse 1.6s ease-out infinite; border: 2px solid rgba(255, 92, 122, .6); }
+  .orb.listening ~ .ring.r2 { animation-delay: .5s; }
+  .orb.listening ~ .ring.r3 { animation-delay: 1s; }
+  @keyframes pulse {
+    from { transform: scale(1); opacity: .9; }
+    to   { transform: scale(2.1); opacity: 0; }
+  }
+
+  .hint { color: var(--ink-dim); font-size: 14px; min-height: 20px; text-align: center; }
+  .hint b { color: var(--ink); }
+
+  .modes { display: flex; gap: 10px; align-items: center; }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--ink-dim); cursor: pointer; user-select: none;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09);
+    padding: 7px 14px; border-radius: 999px;
+  }
+  .toggle input { accent-color: var(--accent); }
+  .toggle.on { color: var(--ink); border-color: rgba(124, 92, 255, .5); }
+
+  .heard {
+    font-family: var(--serif); font-style: italic; font-size: 17px;
+    color: var(--ink-dim); text-align: center; min-height: 24px; max-width: 620px;
+  }
+  .heard .final { color: var(--ink); }
+
+  /* ---- typed fallback ---- */
+  form.typed { display: flex; gap: 8px; width: 100%; max-width: 460px; }
+  form.typed input {
+    flex: 1; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+    color: var(--ink); border-radius: 12px; padding: 12px 16px; font-size: 16px; outline: none;
+    font-family: var(--font);
+  }
+  form.typed input:focus { border-color: var(--accent); }
+  form.typed button {
+    background: linear-gradient(135deg, var(--accent), #5a3fe0); color: #fff; border: none;
+    border-radius: 12px; padding: 12px 20px; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+
+  /* ---- status / suggestions ---- */
+  .status { font-size: 14px; color: var(--ink-dim); text-align: center; min-height: 20px; }
+  .status.err { color: var(--hot); }
+  .status .spin {
+    display: inline-block; width: 13px; height: 13px; margin-right: 7px; vertical-align: -2px;
+    border: 2px solid rgba(255,255,255,.25); border-top-color: var(--accent2);
+    border-radius: 50%; animation: rot .8s linear infinite;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chips .lead { width: 100%; text-align: center; color: var(--ink-dim); font-size: 14px; }
+  .chip {
+    background: rgba(34, 211, 238, .1); border: 1px solid rgba(34, 211, 238, .4);
+    color: var(--accent2); border-radius: 999px; padding: 7px 16px; font-size: 15px;
+    cursor: pointer; font-family: var(--font); font-weight: 600;
+  }
+  .chip:hover { background: rgba(34, 211, 238, .2); }
+
+  /* ---- result card ---- */
+  .card {
+    width: 100%; background: var(--card); border: 1px solid rgba(255,255,255,.08);
+    border-radius: var(--radius); padding: 26px 28px; box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    animation: rise .35s ease; overflow-wrap: break-word;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  .word-line { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .word-line h2 { font-family: var(--serif); font-size: clamp(30px, 6vw, 42px); letter-spacing: -.01em; }
+  .word-line .corrected { font-size: 13px; color: var(--ink-dim); }
+  .word-line .corrected s { color: var(--hot); }
+  .speak-btn {
+    margin-left: auto; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14);
+    color: var(--ink); border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .speak-btn:hover { border-color: var(--accent2); }
+
+  .section { margin-top: 22px; }
+  .section > h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--accent2); margin-bottom: 10px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section > h3::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.08); }
+  .section > h3 .tag {
+    font-size: 10px; letter-spacing: .05em; background: rgba(124,92,255,.18);
+    border: 1px solid rgba(124,92,255,.4); color: #c4b5fd; padding: 2px 8px; border-radius: 999px;
+  }
+
+  .ety-body { font-family: var(--serif); font-size: 17px; line-height: 1.75; color: var(--ink); }
+  .ety-body p { margin-bottom: 10px; }
+  .ety-body a { color: var(--accent2); text-decoration: none; border-bottom: 1px dotted rgba(34,211,238,.5); }
+  .ety-body a:hover { border-bottom-style: solid; }
+  .ety-body i, .ety-body .mention { font-style: italic; }
+  .ety-body ul, .ety-body ol { margin: 8px 0 8px 22px; }
+
+  .defs { display: flex; flex-direction: column; gap: 14px; }
+  .pos { font-size: 13px; font-weight: 700; color: var(--accent); text-transform: lowercase; font-style: italic; }
+  .defs ol { margin: 6px 0 0 22px; font-size: 15.5px; line-height: 1.6; color: var(--ink); }
+  .defs ol li { margin-bottom: 5px; }
+  .defs ol li::marker { color: var(--ink-dim); }
+  .defs a { color: var(--accent2); text-decoration: none; }
+
+  .ud-entry {
+    background: var(--card2); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px;
+    border-left: 3px solid var(--hot); font-size: 15.5px; line-height: 1.6;
+  }
+  .ud-entry .ud-def { color: var(--ink); }
+  .ud-entry .ud-example { font-family: var(--serif); font-style: italic; color: var(--ink-dim); margin-top: 8px; }
+  .ud-entry .ud-meta { font-size: 12px; color: var(--ink-dim); margin-top: 8px; }
+  .ud-entry .ud-meta .up { color: var(--ok); }
+
+  .empty { color: var(--ink-dim); font-size: 15px; }
+
+  footer { margin-top: 34px; font-size: 12px; color: var(--ink-dim); text-align: center; line-height: 1.7; max-width: 560px; }
+  footer a { color: var(--ink-dim); }
+
+  .nosr {
+    background: rgba(255, 92, 122, .1); border: 1px solid rgba(255, 92, 122, .35);
+    color: #ffb3c1; font-size: 13.5px; border-radius: 12px; padding: 10px 16px; text-align: center;
+    display: none; max-width: 520px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Etymology Voice</h1>
+    <p>Tap the mic and ask: <code>“what is the etymology of serendipity?”</code></p>
+  </header>
+
+  <div class="stage">
+    <div class="orb-wrap">
+      <button id="orb" class="orb" title="Tap to talk" aria-label="Tap to talk">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+        </svg>
+      </button>
+      <span class="ring"></span><span class="ring r2"></span><span class="ring r3"></span>
+    </div>
+
+    <div id="hint" class="hint">Tap to talk</div>
+
+    <div class="modes">
+      <label id="handsfreeLabel" class="toggle">
+        <input type="checkbox" id="handsfree"> hands-free mode
+      </label>
+      <label id="speakLabel" class="toggle on">
+        <input type="checkbox" id="speakBack" checked> speak answers
+      </label>
+    </div>
+
+    <div id="nosr" class="nosr">
+      Your browser doesn’t support speech recognition (try Chrome, Edge, or Safari) — but you can still type a word below.
+    </div>
+
+    <div id="heard" class="heard"></div>
+
+    <form id="typedForm" class="typed">
+      <input id="typedInput" type="text" placeholder="…or type a word" autocomplete="off" autocapitalize="off">
+      <button type="submit">Look up</button>
+    </form>
+
+    <div id="status" class="status"></div>
+    <div id="chips" class="chips"></div>
+    <div id="result"></div>
+  </div>
+
+  <footer>
+    Etymologies &amp; definitions from <a href="https://en.wiktionary.org" target="_blank" rel="noopener">Wiktionary</a>
+    (CC&nbsp;BY-SA). Slang from <a href="https://www.urbandictionary.com" target="_blank" rel="noopener">Urban Dictionary</a>
+    (crowd-sourced — may be unreliable or explicit). Sound-alike matching by
+    <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener">Datamuse</a>.
+  </footer>
+
+<script>
+(() => {
+  "use strict";
+
+  const WIKI_API = "https://en.wiktionary.org/w/api.php";
+  const WIKI_REST_DEF = "https://en.wiktionary.org/api/rest_v1/page/definition/";
+  const UD_API = "https://api.urbandictionary.com/v0/define";
+  const DATAMUSE = "https://api.datamuse.com/words";
+
+  const $ = (id) => document.getElementById(id);
+  const orb = $("orb"), hint = $("hint"), heardEl = $("heard"), statusEl = $("status");
+  const chipsEl = $("chips"), resultEl = $("result");
+  const handsfree = $("handsfree"), speakBack = $("speakBack");
+
+  /* ---------------- speech recognition ---------------- */
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, listening = false, wantListening = false;
+
+  if (!SR) {
+    $("nosr").style.display = "block";
+    $("handsfreeLabel").style.display = "none";
+    orb.style.opacity = ".45";
+  }
+
+  function makeRec() {
+    const r = new SR();
+    r.lang = "en-US";
+    r.interimResults = true;
+    r.continuous = false;
+    r.maxAlternatives = 3;
+
+    r.onstart = () => {
+      listening = true;
+      orb.classList.add("listening");
+      hint.innerHTML = "Listening… ask <b>“etymology of ___”</b>";
+    };
+    r.onresult = (ev) => {
+      let interim = "", finalTxt = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const t = ev.results[i][0].transcript;
+        if (ev.results[i].isFinal) finalTxt += t;
+        else interim += t;
+      }
+      if (interim) heardEl.innerHTML = "“" + esc(interim.trim()) + "…”";
+      if (finalTxt.trim()) {
+        heardEl.innerHTML = "“<span class='final'>" + esc(finalTxt.trim()) + "</span>”";
+        handleUtterance(finalTxt.trim());
+      }
+    };
+    r.onerror = (ev) => {
+      listening = false;
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+        wantListening = false;
+        setStatus("Microphone permission denied — allow mic access, or type a word below.", true);
+      } else if (ev.error !== "no-speech" && ev.error !== "aborted") {
+        setStatus("Speech error: " + ev.error, true);
+      }
+    };
+    r.onend = () => {
+      listening = false;
+      orb.classList.remove("listening");
+      if (wantListening && handsfree.checked) {
+        try { r.start(); } catch (_) { /* restarted too fast; next tap recovers */ }
+      } else {
+        wantListening = false;
+        hint.textContent = "Tap to talk";
+      }
+    };
+    return r;
+  }
+
+  orb.addEventListener("click", () => {
+    if (!SR) { $("typedInput").focus(); return; }
+    if (!rec) rec = makeRec();
+    if (listening) {
+      wantListening = false;
+      rec.stop();
+    } else {
+      wantListening = true;
+      window.speechSynthesis && speechSynthesis.cancel();
+      try { rec.start(); } catch (_) { /* already started */ }
+    }
+  });
+
+  handsfree.addEventListener("change", () => {
+    $("handsfreeLabel").classList.toggle("on", handsfree.checked);
+  });
+  speakBack.addEventListener("change", () => {
+    $("speakLabel").classList.toggle("on", speakBack.checked);
+    if (!speakBack.checked && window.speechSynthesis) speechSynthesis.cancel();
+  });
+
+  $("typedForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("typedInput").value.trim();
+    if (v) { heardEl.textContent = ""; lookup(extractWord(v) || v.toLowerCase()); }
+  });
+
+  /* ---------------- utterance → target word ---------------- */
+
+  const PATTERNS = [
+    /(?:what(?:'s| is| are)?\s+)?(?:the\s+)?(?:etymolog(?:y|ies)|origin|origins|history|root|roots|derivation)\s+(?:of|for|behind)\s+(?:the\s+(?:word|term|phrase|slang)\s+)?(.+)/i,
+    /where\s+(?:does|did|do)\s+(?:the\s+(?:word|term|phrase|slang)\s+)?(.+?)\s+come\s+from/i,
+    /how\s+did\s+(?:the\s+(?:word|term|phrase)\s+)?(.+?)\s+(?:originate|come\s+about|evolve)/i,
+    /what\s+(?:does|did)\s+(.+?)\s+(?:mean|originally\s+mean)/i,
+    /(?:look\s*up|define|search(?:\s+for)?)\s+(?:the\s+(?:word|term|phrase)\s+)?(.+)/i,
+  ];
+
+  function cleanTerm(s) {
+    return s
+      .replace(/[?!.,;:"“”'‘’]+$/g, "")
+      .replace(/^["“”'‘’]+/g, "")
+      .replace(/\b(?:please|thanks|thank you)\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function extractWord(utterance) {
+    const u = utterance.trim();
+    for (const p of PATTERNS) {
+      const m = u.match(p);
+      if (m && m[1]) {
+        const t = cleanTerm(m[1]);
+        if (t) return t;
+      }
+    }
+    // Bare utterance: treat short phrases (≤ 4 words) as the term itself.
+    const bare = cleanTerm(u);
+    if (bare && bare.split(" ").length <= 4) return bare;
+    return null;
+  }
+
+  function handleUtterance(utterance) {
+    const term = extractWord(utterance);
+    if (term) lookup(term);
+    else setStatus("Didn’t catch a word in that — try “etymology of ___”.", true);
+  }
+
+  /* ---------------- ui helpers ---------------- */
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function setStatus(msg, isErr, busy) {
+    statusEl.className = "status" + (isErr ? " err" : "");
+    statusEl.innerHTML = (busy ? "<span class='spin'></span>" : "") + esc(msg);
+  }
+  function clearStatus() { statusEl.textContent = ""; statusEl.className = "status"; }
+  function showChips(lead, words, onPick) {
+    chipsEl.innerHTML = "";
+    if (!words.length) return;
+    const l = document.createElement("div");
+    l.className = "lead"; l.textContent = lead;
+    chipsEl.appendChild(l);
+    for (const w of words) {
+      const b = document.createElement("button");
+      b.className = "chip"; b.type = "button"; b.textContent = w;
+      b.addEventListener("click", () => { chipsEl.innerHTML = ""; onPick(w); });
+      chipsEl.appendChild(b);
+    }
+  }
+
+  /* ---------------- fetch helpers ---------------- */
+
+  async function getJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status + " from " + new URL(url).hostname);
+    return res.json();
+  }
+  const wikiURL = (params) =>
+    WIKI_API + "?origin=*&format=json&formatversion=2&" + new URLSearchParams(params);
+
+  /* ---------------- fuzzy candidates ---------------- */
+
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, i) => i);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) {
+        cur[j] = Math.min(
+          prev[j] + 1,
+          cur[j - 1] + 1,
+          prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+
+  async function fuzzyCandidates(term) {
+    const [open, sounds] = await Promise.allSettled([
+      getJSON(wikiURL({ action: "opensearch", search: term, limit: "8" })),
+      getJSON(DATAMUSE + "?sl=" + encodeURIComponent(term) + "&max=8"),
+    ]);
+    const cands = new Map(); // lower → original
+    if (open.status === "fulfilled" && Array.isArray(open.value[1])) {
+      for (const w of open.value[1]) cands.set(w.toLowerCase(), w);
+    }
+    if (sounds.status === "fulfilled" && Array.isArray(sounds.value)) {
+      for (const o of sounds.value) if (o.word) cands.set(o.word.toLowerCase(), o.word);
+    }
+    cands.delete(term.toLowerCase());
+    return [...cands.values()]
+      .map((w) => ({ w, d: levenshtein(term.toLowerCase(), w.toLowerCase()) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 6);
+  }
+
+  /* ---------------- wiktionary ---------------- */
+
+  async function findWiktionaryPage(term) {
+    // Exact / case-variant / redirect resolution in one query.
+    const titles = [...new Set([term, term.toLowerCase(), term[0].toUpperCase() + term.slice(1)])];
+    const data = await getJSON(wikiURL({
+      action: "query", titles: titles.join("|"), redirects: "1",
+    }));
+    const pages = (data.query && data.query.pages) || [];
+    const hit = pages.find((p) => !p.missing && !p.invalid);
+    return hit ? hit.title : null;
+  }
+
+  async function getSections(title) {
+    const data = await getJSON(wikiURL({ action: "parse", page: title, prop: "sections" }));
+    return (data.parse && data.parse.sections) || [];
+  }
+
+  function pickEtymologySections(sections) {
+    // Language headers are toclevel 1; find English's span, else first language
+    // that has an Etymology subsection.
+    const langs = [];
+    sections.forEach((s, i) => { if (s.toclevel === 1) langs.push({ name: s.line, start: i }); });
+    langs.forEach((l, i) => { l.end = i + 1 < langs.length ? langs[i + 1].start : sections.length; });
+
+    const inLang = (l) => sections.slice(l.start, l.end)
+      .filter((s) => /^Etymology/i.test(s.line))
+      .map((s) => ({ index: s.index, label: s.line }));
+
+    const english = langs.find((l) => l.name === "English");
+    if (english) {
+      const ety = inLang(english);
+      if (ety.length) return { lang: "English", sections: ety };
+    }
+    for (const l of langs) {
+      if (l.name === "English") continue;
+      const ety = inLang(l);
+      if (ety.length) return { lang: l.name, sections: ety };
+    }
+    return { lang: english ? "English" : (langs[0] && langs[0].name) || null, sections: [] };
+  }
+
+  async function getSectionHTML(title, index) {
+    const data = await getJSON(wikiURL({
+      action: "parse", page: title, section: String(index),
+      prop: "text", disableeditsection: "1", disablelimitreport: "1", disabletoc: "1",
+    }));
+    return (data.parse && data.parse.text) || "";
+  }
+
+  function sanitizeWikiHTML(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    doc.querySelectorAll(
+      "script, style, link, iframe, object, embed, form, input, " +
+      ".mw-editsection, .reference, .noprint, .sister-wikipedia, .thumb, figure, " +
+      ".NavFrame, .maintenance-line, .request-box, .catlinks, .mw-references-wrap, " +
+      "table, sup.reference, .previewonly, .reference-text, [class*='ambox']"
+    ).forEach((n) => n.remove());
+    doc.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((n) => n.remove());
+    doc.querySelectorAll("*").forEach((n) => {
+      for (const a of [...n.attributes]) {
+        if (/^on/i.test(a.name) || a.name === "style" || a.name === "srcset") n.removeAttribute(a.name);
+      }
+    });
+    doc.querySelectorAll("a").forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      if (href.startsWith("/")) a.setAttribute("href", "https://en.wiktionary.org" + href);
+      else if (href.startsWith("#") || href.startsWith("javascript:")) { a.removeAttribute("href"); return; }
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+    });
+    const root = doc.body;
+    // Drop leading/trailing empties
+    [...root.querySelectorAll("p")].forEach((p) => { if (!p.textContent.trim()) p.remove(); });
+    return root.innerHTML.trim();
+  }
+
+  async function getDefinitions(title) {
+    try {
+      const data = await getJSON(WIKI_REST_DEF + encodeURIComponent(title.replace(/ /g, "_")) + "?redirect=true");
+      const en = data.en || data[Object.keys(data)[0]] || [];
+      return en.map((e) => ({
+        pos: e.partOfSpeech,
+        defs: (e.definitions || [])
+          .map((d) => sanitizeWikiHTML(d.definition || ""))
+          .filter((d) => d && d.replace(/<[^>]*>/g, "").trim())
+          .slice(0, 4),
+      })).filter((e) => e.defs.length).slice(0, 4);
+    } catch (_) { return []; }
+  }
+
+  /* ---------------- urban dictionary ---------------- */
+
+  async function getUrban(term) {
+    try {
+      const data = await getJSON(UD_API + "?term=" + encodeURIComponent(term));
+      const list = (data.list || [])
+        .filter((e) => e.word && e.word.toLowerCase() === term.toLowerCase())
+        .sort((a, b) => (b.thumbs_up || 0) - (a.thumbs_up || 0));
+      const pool = list.length ? list : (data.list || []);
+      return pool.slice(0, 3).map((e) => ({
+        word: e.word,
+        def: (e.definition || "").replace(/[\[\]]/g, ""),
+        example: (e.example || "").replace(/[\[\]]/g, ""),
+        up: e.thumbs_up || 0,
+        down: e.thumbs_down || 0,
+        author: e.author || "",
+      }));
+    } catch (_) { return []; }
+  }
+
+  /* ---------------- speech synthesis ---------------- */
+
+  function speak(text) {
+    if (!speakBack.checked || !window.speechSynthesis || !text) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0;
+    u.lang = "en-US";
+    speechSynthesis.speak(u);
+  }
+
+  function firstSentences(text, maxLen) {
+    const clean = text.replace(/\s+/g, " ").trim();
+    if (clean.length <= maxLen) return clean;
+    const cut = clean.slice(0, maxLen);
+    const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "));
+    return stop > maxLen * 0.4 ? cut.slice(0, stop + 1) : cut + "…";
+  }
+
+  /* ---------------- render ---------------- */
+
+  function render(term, { correctedFrom, etyLang, etyHTML, definitions, urban, wikiTitle }) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const head = document.createElement("div");
+    head.className = "word-line";
+    head.innerHTML = "<h2>" + esc(term) + "</h2>" +
+      (correctedFrom
+        ? "<span class='corrected'>heard <s>" + esc(correctedFrom) + "</s>, corrected</span>"
+        : "");
+    const sp = document.createElement("button");
+    sp.className = "speak-btn";
+    sp.innerHTML = "🔊 replay";
+    card.appendChild(head);
+    head.appendChild(sp);
+
+    let spokenParts = [];
+
+    if (etyHTML) {
+      const s = document.createElement("div");
+      s.className = "section";
+      s.innerHTML = "<h3>Origin &amp; evolution" +
+        (etyLang && etyLang !== "English" ? " <span class='tag'>" + esc(etyLang) + "</span>" : "") +
+        "</h3><div class='ety-body'>" + etyHTML + "</div>";
+      card.appendChild(s);
+      const plain = s.querySelector(".ety-body").textContent;
+      spokenParts.push("Etymology of " + term + ". " + firstSentences(plain, 420));
+    }
+
+    if (definitions && definitions.length) {
+      const s = document.createElement("div");
+      s.className = "section";
+      let inner = "<h3>What it means today</h3><div class='defs'>";
+      for (const d of definitions) {
+        inner += "<div><div class='pos'>" + esc(d.pos || "") + "</div><ol>" +
+          d.defs.map((x) => "<li>" + x + "</li>").join("") + "</ol></div>";
+      }
+      inner += "</div>";
+      s.innerHTML = inner;
+      card.appendChild(s);
+      if (!etyHTML) {
+        const firstDef = s.querySelector("ol li");
+        if (firstDef) spokenParts.push(term + " means: " + firstSentences(firstDef.textContent, 220));
+      }
+    }
+
+    if (urban && urban.length) {
+      const s = document.createElement("div");
+      s.className = "section";
+      let inner = "<h3>Street usage <span class='tag'>Urban Dictionary</span></h3>";
+      for (const e of urban) {
+        inner += "<div class='ud-entry'><div class='ud-def'>" + esc(firstSentences(e.def, 500)) + "</div>" +
+          (e.example ? "<div class='ud-example'>“" + esc(firstSentences(e.example, 240)) + "”</div>" : "") +
+          "<div class='ud-meta'><span class='up'>▲ " + e.up + "</span> &nbsp;▼ " + e.down +
+          (e.author ? " &nbsp;·&nbsp; by " + esc(e.author) : "") + "</div></div>";
+      }
+      s.innerHTML = inner;
+      card.appendChild(s);
+      if (!etyHTML && !definitions.length) {
+        spokenParts.push("From Urban Dictionary, " + term + ": " + firstSentences(urban[0].def, 320));
+      }
+    }
+
+    if (!etyHTML && (!definitions || !definitions.length) && (!urban || !urban.length)) {
+      card.innerHTML += "<div class='section'><div class='empty'>No etymology, definition, or slang entry found for this one.</div></div>";
+    } else if (!etyHTML && wikiTitle) {
+      const note = document.createElement("div");
+      note.className = "section";
+      note.innerHTML = "<div class='empty'>Wiktionary has this word but no etymology section — " +
+        "<a href='https://en.wiktionary.org/wiki/" + encodeURIComponent(wikiTitle.replace(/ /g, "_")) +
+        "' target='_blank' rel='noopener' style='color:var(--accent2)'>see the full entry</a>.</div>";
+      card.appendChild(note);
+    }
+
+    if (wikiTitle) {
+      const src = document.createElement("div");
+      src.className = "section";
+      src.innerHTML = "<div class='empty' style='font-size:13px'>Full entry: " +
+        "<a href='https://en.wiktionary.org/wiki/" + encodeURIComponent(wikiTitle.replace(/ /g, "_")) +
+        "' target='_blank' rel='noopener' style='color:var(--accent2)'>en.wiktionary.org/wiki/" + esc(wikiTitle) + "</a></div>";
+      card.appendChild(src);
+    }
+
+    resultEl.innerHTML = "";
+    resultEl.appendChild(card);
+
+    const spoken = spokenParts.join(" ");
+    sp.addEventListener("click", () => {
+      if (window.speechSynthesis) { speechSynthesis.cancel(); }
+      speakBack.checked = true;
+      $("speakLabel").classList.add("on");
+      speak(spoken || "Nothing found for " + term);
+    });
+    speak(spoken);
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ---------------- main lookup flow ---------------- */
+
+  let lookupSeq = 0;
+
+  async function lookup(term, opts = {}) {
+    const seq = ++lookupSeq;
+    chipsEl.innerHTML = "";
+    setStatus("Looking up “" + term + "”…", false, true);
+
+    try {
+      let wikiTitle = await findWiktionaryPage(term);
+      let correctedFrom = opts.correctedFrom || null;
+
+      // Fuzzy rescue: the mic misheard, or a typo.
+      if (!wikiTitle && !opts.noFuzzy) {
+        setStatus("“" + term + "” not found — fuzzy matching…", false, true);
+        const cands = await fuzzyCandidates(term);
+        if (seq !== lookupSeq) return;
+        const usable = [];
+        for (const c of cands) {
+          usable.push(c);
+          if (usable.length >= 6) break;
+        }
+        const confident = usable.length && usable[0].d <= 2 &&
+          (usable.length === 1 || usable[0].d < usable[1].d);
+        if (confident) {
+          correctedFrom = term;
+          term = usable[0].w.toLowerCase();
+          wikiTitle = await findWiktionaryPage(term);
+        } else if (usable.length) {
+          // Still try Urban Dictionary for the raw term before giving up —
+          // slang often isn't in Wiktionary at all.
+          const urban = await getUrban(term);
+          if (seq !== lookupSeq) return;
+          if (urban.length) {
+            clearStatus();
+            render(term, { correctedFrom: null, etyLang: null, etyHTML: "", definitions: [], urban, wikiTitle: null });
+            return;
+          }
+          clearStatus();
+          showChips("Couldn’t find “" + term + "” — did you mean:", usable.map((c) => c.w),
+            (w) => lookup(w.toLowerCase(), { correctedFrom: term, noFuzzy: true }));
+          return;
+        }
+      }
+
+      // Gather everything in parallel.
+      const urbanP = getUrban(term);
+      let etyHTML = "", etyLang = null, definitions = [];
+
+      if (wikiTitle) {
+        const sections = await getSections(wikiTitle);
+        if (seq !== lookupSeq) return;
+        const picked = pickEtymologySections(sections);
+        etyLang = picked.lang;
+        const parts = await Promise.all(
+          picked.sections.slice(0, 3).map((s) => getSectionHTML(wikiTitle, s.index))
+        );
+        if (seq !== lookupSeq) return;
+        const cleaned = parts.map(sanitizeWikiHTML).filter(Boolean);
+        etyHTML = cleaned.length > 1
+          ? cleaned.map((h, i) => "<p style='color:var(--accent);font-family:var(--font);font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px'>" +
+              esc(picked.sections[i].label) + "</p>" + h).join("")
+          : (cleaned[0] || "");
+        definitions = await getDefinitions(wikiTitle);
+        if (seq !== lookupSeq) return;
+      }
+
+      const urban = await urbanP;
+      if (seq !== lookupSeq) return;
+
+      clearStatus();
+      render(term, { correctedFrom, etyLang, etyHTML, definitions, urban, wikiTitle });
+    } catch (err) {
+      if (seq !== lookupSeq) return;
+      setStatus("Lookup failed: " + err.message + " — check your connection and try again.", true);
+    }
+  }
+
+  /* expose for quick console testing */
+  window.__ety = { lookup, extractWord };
+})();
+</script>
+</body>
+</html>
